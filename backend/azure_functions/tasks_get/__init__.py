@@ -1,0 +1,33 @@
+import azure.functions as func
+import json
+from shared_code import db
+from shared_code.utils import get_user_from_token
+
+
+def main(req: func.HttpRequest) -> func.HttpResponse:
+    user = get_user_from_token(req)
+    if not user:
+        return func.HttpResponse(
+            json.dumps({"error": "Unauthorized"}),
+            status_code=401,
+            mimetype="application/json",
+        )
+
+    try:
+        _, _, tasks_container = db.get_containers()
+    except Exception as e:
+        return func.HttpResponse(
+            json.dumps({"error": "Could not connect to database", "details": str(e)}),
+            status_code=503,
+            mimetype="application/json",
+        )
+
+    query = "SELECT * FROM c WHERE c.userId=@uid"
+    params = [{"name": "@uid", "value": user["sub"]}]
+    items = list(
+        tasks_container.query_items(
+            query=query, parameters=params, enable_cross_partition_query=False
+        )
+    )
+
+    return func.HttpResponse(json.dumps(items), mimetype="application/json")

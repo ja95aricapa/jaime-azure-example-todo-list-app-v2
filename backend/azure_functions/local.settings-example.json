@@ -1,0 +1,19 @@
+{
+    "IsEncrypted": false,
+    "Values": {
+        "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+        "FUNCTIONS_WORKER_RUNTIME": "python",
+        "COSMOS_URI": "AQUÍ PEGAS EL URI QUE COPIASTE DEL PORTAL",
+        "COSMOS_KEY": "AQUÍ PEGAS LA CLAVE PRINCIPAL QUE COPIASTE",
+        "COSMOS_VERIFY": "true",
+        "COSMOS_DB_NAME": "todoapp",
+        "COSMOS_USERS_CONTAINER": "users",
+        "COSMOS_TASKS_CONTAINER": "tasks",
+        "JWT_SECRET": "supersecret"
+    },
+    "Host": {
+        "LocalHttpPort": 7071,
+        "CORS": "http://localhost:3000",
+        "CORSCredentials": true
+    }
+}
