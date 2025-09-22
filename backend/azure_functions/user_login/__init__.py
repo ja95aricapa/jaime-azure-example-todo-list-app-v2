@@ -1,9 +1,15 @@
-import azure.functions as func
-import json, jwt, datetime, os
-import bcrypt
-from shared_code import db
+import datetime
+import json
+import logging
 
-SECRET = os.getenv("JWT_SECRET", "supersecret")
+import azure.functions as func
+import bcrypt
+import jwt
+
+from shared_code import db
+from shared_code.utils import get_jwt_secret
+
+logger = logging.getLogger(__name__)
 
 
 def _verify_password(plain_password: str, stored_hash: str) -> bool:
@@ -21,8 +27,9 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
         _, users_container, _ = db.get_containers()
     except Exception as e:
+        logger.exception("No se pudo conectar a Cosmos DB durante login")
         return func.HttpResponse(
-            json.dumps({"error": "Could not connect to database", "details": str(e)}),
+            json.dumps({"error": "Could not connect to database"}),
             status_code=503,
             mimetype="application/json",
         )
@@ -30,14 +37,23 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
         body = req.get_json()
     except ValueError:
+        logger.warning("Payload inválido en login")
         return func.HttpResponse(
             json.dumps({"error": "Invalid JSON in request body"}),
             status_code=400,
             mimetype="application/json",
         )
 
-    email = body.get("email")
+    email = (body.get("email") or "").strip().lower()
     password = body.get("password")
+
+    if not email or not password:
+        logger.info("Intento de login sin credenciales completas")
+        return func.HttpResponse(
+            json.dumps({"error": "Credenciales inválidas"}),
+            status_code=401,
+            mimetype="application/json",
+        )
 
     query = "SELECT * FROM c WHERE c.email=@e"
     params = [{"name": "@e", "value": email}]
@@ -50,6 +66,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     )
 
     if not items or not _verify_password(password or "", items[0].get("password", "")):
+        logger.info("Login fallido para %s", email)
         return func.HttpResponse(
             json.dumps({"error": "Credenciales inválidas"}),
             status_code=401,
@@ -62,6 +79,20 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         "email": email,
         "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1),
     }
-    token = jwt.encode(payload, SECRET, algorithm="HS256")
+    try:
+        secret = get_jwt_secret()
+    except RuntimeError as err:
+        logger.error("Configuración de JWT inválida: %s", err)
+        return func.HttpResponse(
+            json.dumps({"error": "Authentication service misconfigured"}),
+            status_code=500,
+            mimetype="application/json",
+        )
+
+    token = jwt.encode(payload, secret, algorithm="HS256")
+    if isinstance(token, bytes):
+        token = token.decode("utf-8")
+
+    logger.info("Login exitoso para %s", email)
 
     return func.HttpResponse(json.dumps({"token": token}), mimetype="application/json")

@@ -1,5 +1,7 @@
+import logging
 import os
 import time
+
 from azure.cosmos import CosmosClient, PartitionKey, exceptions
 
 COSMOS_URI = os.getenv("COSMOS_URI", "https://127.0.0.1:8081")
@@ -11,6 +13,7 @@ USER_CONTAINER = os.getenv("COSMOS_USERS_CONTAINER", "users")
 TASK_CONTAINER = os.getenv("COSMOS_TASKS_CONTAINER", "tasks")
 
 _client = _db = _users = _tasks = None
+logger = logging.getLogger(__name__)
 
 
 def _connect_once():
@@ -51,28 +54,37 @@ def get_containers(max_retries: int = 10, base_delay: float = 1.5):
         return _db, _users, _tasks
 
     last_err = None
-    print(
-        f"Attempting to connect to Cosmos DB... (retries={max_retries}, delay={base_delay}s)"
+    logger.info(
+        "Intentando conectar a Cosmos DB (retries=%s, delay=%ss)",
+        max_retries,
+        base_delay,
     )
     for i in range(max_retries):
         try:
             _client, _db, _users, _tasks = _connect_once()
-            print("Successfully connected to Cosmos DB!")
+            logger.info("Conectado a Cosmos DB correctamente")
             return _db, _users, _tasks
         except exceptions.CosmosHttpResponseError as e:
             wait_time = base_delay * (2**i)
-            print(
-                f"Connection failed (attempt {i+1}/{max_retries}). Retrying in {wait_time:.2f} seconds..."
+            logger.warning(
+                "Fallo al conectar a Cosmos DB (intento %s/%s). Reintentando en %.2f s. Detalle: %s",
+                i + 1,
+                max_retries,
+                wait_time,
+                e,
+                exc_info=True,
             )
             last_err = e
             time.sleep(wait_time)
         except Exception as e:
             wait_time = base_delay * (2**i)
-            print(
-                f"An unexpected connection error occurred (attempt {i+1}/{max_retries}): {e}. Retrying in {wait_time:.2f} seconds..."
+            logger.exception(
+                "Error inesperado al conectar a Cosmos DB (intento %s/%s)",
+                i + 1,
+                max_retries,
             )
             last_err = e
             time.sleep(wait_time)
 
-    print("Failed to connect to Cosmos DB after all retries.")
+    logger.error("No fue posible conectar a Cosmos DB tras todos los reintentos")
     raise last_err

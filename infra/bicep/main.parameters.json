@@ -1,0 +1,35 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "namePrefix": {
+      "value": "todoapp"
+    },
+    "location": {
+      "value": "eastus"
+    },
+    "jwtSecret": {
+      "value": "REEMPLAZA_CON_UN_SECRETO_SEGURO"
+    },
+    "apiManagementPublisherEmail": {
+      "value": "admin@example.com"
+    },
+    "apiManagementPublisherName": {
+      "value": "TodoApp"
+    },
+    "apiManagementSkuName": {
+      "value": "Consumption"
+    },
+    "apiManagementSkuCapacity": {
+      "value": 0
+    },
+    "allowedCorsOrigins": {
+      "value": [
+        "https://todo.example.com"
+      ]
+    },
+    "cosmosMaxAutoscaleThroughput": {
+      "value": 4000
+    }
+  }
+}

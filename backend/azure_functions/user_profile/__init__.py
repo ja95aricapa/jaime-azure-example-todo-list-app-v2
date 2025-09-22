@@ -1,7 +1,12 @@
-import azure.functions as func
 import json
+import logging
+
+import azure.functions as func
+
 from shared_code import db
 from shared_code.utils import get_user_from_token
+
+logger = logging.getLogger(__name__)
 
 
 def _sanitize_user(u: dict) -> dict:
@@ -12,8 +17,18 @@ def _sanitize_user(u: dict) -> dict:
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
-    user = get_user_from_token(req)
+    try:
+        user = get_user_from_token(req)
+    except RuntimeError as err:
+        logger.error("Error de configuración JWT: %s", err)
+        return func.HttpResponse(
+            json.dumps({"error": "Authentication service misconfigured"}),
+            status_code=500,
+            mimetype="application/json",
+        )
+
     if not user:
+        logger.warning("Acceso no autorizado a perfil")
         return func.HttpResponse(
             json.dumps({"error": "Unauthorized"}),
             status_code=401,
@@ -23,8 +38,9 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
         _, users_container, _ = db.get_containers()
     except Exception as e:
+        logger.exception("No se pudo conectar a Cosmos DB al manejar perfil")
         return func.HttpResponse(
-            json.dumps({"error": "Could not connect to database", "details": str(e)}),
+            json.dumps({"error": "Could not connect to database"}),
             status_code=503,
             mimetype="application/json",
         )
@@ -35,6 +51,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
         existing = users_container.read_item(item=user_id, partition_key=user["email"])
     except Exception:
+        logger.warning("Perfil no encontrado para %s", user_id, exc_info=True)
         return func.HttpResponse(
             json.dumps({"error": "User profile not found"}),
             status_code=404,
@@ -42,6 +59,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         )
 
     if req.method == "GET":
+        logger.debug("Perfil consultado para %s", user_id)
         return func.HttpResponse(
             json.dumps({"user": _sanitize_user(existing)}),
             mimetype="application/json",
@@ -51,6 +69,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
         body = req.get_json()
     except ValueError:
+        logger.warning("JSON inválido al actualizar perfil %s", user_id)
         return func.HttpResponse(
             json.dumps({"error": "Invalid JSON in request body"}),
             status_code=400,
@@ -59,6 +78,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
     # No permitir cambiar email (partition key)
     if "email" in body and body["email"] != existing.get("email"):
+        logger.info("Intento de cambio de email para %s bloqueado", user_id)
         return func.HttpResponse(
             json.dumps(
                 {
@@ -70,9 +90,25 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         )
 
     if "name" in body:
-        existing["name"] = body["name"]
+        new_name = (body["name"] or "").strip()
+        if not new_name:
+            return func.HttpResponse(
+                json.dumps({"error": "name cannot be empty"}),
+                status_code=400,
+                mimetype="application/json",
+            )
+        existing["name"] = new_name
 
-    users_container.upsert_item(existing)
+    try:
+        users_container.upsert_item(existing)
+        logger.info("Perfil actualizado para %s", user_id)
+    except Exception:
+        logger.exception("Error al actualizar perfil %s", user_id)
+        return func.HttpResponse(
+            json.dumps({"error": "Could not update profile"}),
+            status_code=500,
+            mimetype="application/json",
+        )
 
     return func.HttpResponse(
         json.dumps({"message": "Perfil actualizado", "user": _sanitize_user(existing)}),

@@ -2,6 +2,8 @@ import axios from "axios";
 
 const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:7071/api";
 const SHOW_HTTP_LOGS = process.env.REACT_APP_SHOW_HTTP_LOGS === "true";
+const API_KEY = process.env.REACT_APP_API_KEY;
+const API_KEY_HEADER = process.env.REACT_APP_API_KEY_HEADER || "x-functions-key";
 
 const api = axios.create({ baseURL: API_BASE });
 
@@ -10,6 +12,9 @@ api.interceptors.request.use(
     const token = localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    if (API_KEY) {
+      config.headers[API_KEY_HEADER] = API_KEY;
     }
     if (SHOW_HTTP_LOGS) {
       console.log("➡️ Request:", config);
