@@ -18,7 +18,6 @@ def _connect_once():
     Hace la conexión y crea DB/contenedores si no existen.
     Se llama sólo cuando aún no hay conexión (lazy init).
     """
-    # Agregamos un timeout a la conexión del cliente
     client = CosmosClient(
         COSMOS_URI,
         credential=COSMOS_KEY,
@@ -26,16 +25,22 @@ def _connect_once():
         connection_timeout=30,  # Timeout de conexión de 30 segundos
     )
     db = client.create_database_if_not_exists(id=DATABASE_NAME)
+
+    # Unique Key Policy para asegurar unicidad de /email
+    unique_key_policy = {"uniqueKeys": [{"paths": ["/email"]}]}
+
     users = db.create_container_if_not_exists(
-        id=USER_CONTAINER, partition_key=PartitionKey(path="/email")
+        id=USER_CONTAINER,
+        partition_key=PartitionKey(path="/email"),
+        unique_key_policy=unique_key_policy,
     )
+
     tasks = db.create_container_if_not_exists(
         id=TASK_CONTAINER, partition_key=PartitionKey(path="/userId")
     )
     return client, db, users, tasks
 
 
-# Aumentamos los valores por defecto para darle más tiempo al emulador
 def get_containers(max_retries: int = 10, base_delay: float = 1.5):
     """
     Devuelve (db, users_container, tasks_container).
@@ -55,7 +60,6 @@ def get_containers(max_retries: int = 10, base_delay: float = 1.5):
             print("Successfully connected to Cosmos DB!")
             return _db, _users, _tasks
         except exceptions.CosmosHttpResponseError as e:
-            # 503 típico mientras el emulador “arranca”
             wait_time = base_delay * (2**i)
             print(
                 f"Connection failed (attempt {i+1}/{max_retries}). Retrying in {wait_time:.2f} seconds..."
@@ -63,7 +67,6 @@ def get_containers(max_retries: int = 10, base_delay: float = 1.5):
             last_err = e
             time.sleep(wait_time)
         except Exception as e:
-            # Captura otros errores de conexión, como timeouts
             wait_time = base_delay * (2**i)
             print(
                 f"An unexpected connection error occurred (attempt {i+1}/{max_retries}): {e}. Retrying in {wait_time:.2f} seconds..."
@@ -71,6 +74,5 @@ def get_containers(max_retries: int = 10, base_delay: float = 1.5):
             last_err = e
             time.sleep(wait_time)
 
-    # Si no se pudo luego de reintentos, que el handler HTTP lo informe como 503.
     print("Failed to connect to Cosmos DB after all retries.")
     raise last_err

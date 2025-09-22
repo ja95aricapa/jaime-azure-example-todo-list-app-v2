@@ -26,7 +26,9 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     params = [{"name": "@uid", "value": user["sub"]}]
     items = list(
         tasks_container.query_items(
-            query=query, parameters=params, enable_cross_partition_query=False
+            query=query,
+            parameters=params,
+            partition_key=user["sub"],  # 👈 mono-partición
         )
     )
 

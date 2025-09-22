@@ -1,8 +1,20 @@
 import azure.functions as func
 import json, jwt, datetime, os
+import bcrypt
 from shared_code import db
 
 SECRET = os.getenv("JWT_SECRET", "supersecret")
+
+
+def _verify_password(plain_password: str, stored_hash: str) -> bool:
+    # Compatibilidad: si lo almacenado parece bcrypt, verifica bcrypt; si no, compara texto (legacy).
+    try:
+        if stored_hash and stored_hash.startswith("$2"):
+            return bcrypt.checkpw(plain_password.encode("utf-8"), stored_hash.encode("utf-8"))
+        # Legacy fallback (no recomendado, sólo para transición)
+        return plain_password == stored_hash
+    except Exception:
+        return False
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
@@ -29,14 +41,15 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
     query = "SELECT * FROM c WHERE c.email=@e"
     params = [{"name": "@e", "value": email}]
-    # Note: enable_cross_partition_query is not needed if 'email' is the partition key
     items = list(
         users_container.query_items(
-            query=query, parameters=params, enable_cross_partition_query=True
+            query=query,
+            parameters=params,
+            partition_key=email,  # 👈 mono-partición por /email
         )
     )
 
-    if not items or items[0].get("password") != password:
+    if not items or not _verify_password(password or "", items[0].get("password", "")):
         return func.HttpResponse(
             json.dumps({"error": "Credenciales inválidas"}),
             status_code=401,

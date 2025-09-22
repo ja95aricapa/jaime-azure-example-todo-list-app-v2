@@ -13,11 +13,12 @@ function Dashboard() {
 	useEffect(() => {
 		if (!token) navigate("/");
 		loadTasks();
-	}, []);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []); // intención original conservada
 
 	const loadTasks = async () => {
 		try {
-			const res = await getTasks(token);
+			const res = await getTasks();
 			setTasks(res.data);
 		} catch (err) {
 			console.error(err);
@@ -25,14 +26,18 @@ function Dashboard() {
 	};
 
 	const handleSave = async (task) => {
-		if (editing) {
-			await updateTask(editing.id, task, token);
-		} else {
-			await createTask(task, token);
+		try {
+			if (editing) {
+				await updateTask(editing.id, task);
+			} else {
+				await createTask(task);
+			}
+			setEditing(null);
+			setModalOpen(false);
+			loadTasks();
+		} catch (e) {
+			alert("Error: " + (e.response?.data?.error || e.message));
 		}
-		setEditing(null);
-		setModalOpen(false);
-		loadTasks();
 	};
 
 	return (
@@ -52,7 +57,15 @@ function Dashboard() {
 							>
 								Editar
 							</button>
-							<button onClick={() => deleteTask(t.id, token).then(loadTasks)}>
+							<button
+								onClick={() =>
+									deleteTask(t.id)
+										.then(loadTasks)
+										.catch((e) =>
+											alert("Error: " + (e.response?.data?.error || e.message))
+										)
+								}
+							>
 								Borrar
 							</button>
 						</li>

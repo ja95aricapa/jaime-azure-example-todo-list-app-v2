@@ -48,7 +48,24 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             mimetype="application/json",
         )
 
-    task.update(body)
+    allowed_fields = {"title", "status"}
+    update_data = {k: v for k, v in body.items() if k in allowed_fields}
+
+    if "status" in update_data and update_data["status"] not in {"pending", "done"}:
+        return func.HttpResponse(
+            json.dumps({"error": "Invalid status. Use 'pending' or 'done'."}),
+            status_code=400,
+            mimetype="application/json",
+        )
+
+    # Aplica cambios permitidos
+    for k, v in update_data.items():
+        task[k] = v
+
+    # Explicitamente NO permitir cambiar id / userId
+    task["id"] = task_id
+    task["userId"] = user["sub"]
+
     tasks_container.upsert_item(task)
 
     return func.HttpResponse(json.dumps(task), mimetype="application/json")
