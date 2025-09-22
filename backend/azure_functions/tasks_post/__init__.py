@@ -39,10 +39,24 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             mimetype="application/json",
         )
 
+    allowed_statuses = {"pending", "in_progress"}
+    status = body.get("status", "pending")
+    if status not in allowed_statuses:
+        return func.HttpResponse(
+            json.dumps(
+                {
+                    "error": "Invalid status for new task",
+                    "allowed": sorted(list(allowed_statuses)),
+                }
+            ),
+            status_code=400,
+            mimetype="application/json",
+        )
+
     task = {
         "id": str(uuid.uuid4()),
         "title": title,
-        "status": body.get("status", "pending"),
+        "status": status,
         "userId": user["sub"],
     }
 

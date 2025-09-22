@@ -51,9 +51,15 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     allowed_fields = {"title", "status"}
     update_data = {k: v for k, v in body.items() if k in allowed_fields}
 
-    if "status" in update_data and update_data["status"] not in {"pending", "done"}:
+    allowed_statuses = {"pending", "in_progress", "done", "blocked"}
+    if "status" in update_data and update_data["status"] not in allowed_statuses:
         return func.HttpResponse(
-            json.dumps({"error": "Invalid status. Use 'pending' or 'done'."}),
+            json.dumps(
+                {
+                    "error": "Invalid status",
+                    "allowed": sorted(list(allowed_statuses)),
+                }
+            ),
             status_code=400,
             mimetype="application/json",
         )

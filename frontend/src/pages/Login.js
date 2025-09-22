@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { login, register } from "../api";
 import { useNavigate } from "react-router-dom";
+import { login, register } from "../api";
 
 function Login() {
 	const [isRegister, setIsRegister] = useState(false);
@@ -11,58 +11,75 @@ function Login() {
 		e.preventDefault();
 		try {
 			if (isRegister) {
-				// 1. Llama a la función de registro
 				await register(form.email, form.password, form.name);
-				// 2. Muestra un mensaje de éxito
-				alert("¡Registro exitoso! Ahora por favor inicia sesión.");
-				// 3. Cambia el formulario de vuelta a modo Login
+				alert("¡Registro exitoso! Ahora inicia sesión.");
 				setIsRegister(false);
 			} else {
-				// El flujo de login ya funciona bien
 				const res = await login(form.email, form.password);
 				localStorage.setItem("token", res.data.token);
 				navigate("/dashboard");
 			}
 		} catch (err) {
-			alert("Error: " + err.response?.data?.error || err.message);
+			const message = err.response?.data?.error || err.message;
+			alert("Error: " + message);
 		}
 	};
 
 	return (
-		<div style={{ padding: "2rem" }}>
-			<h2>{isRegister ? "Registro" : "Login"}</h2>
-			<form onSubmit={handleSubmit}>
-				{isRegister && (
-					<input
-						placeholder='Nombre'
-						value={form.name}
-						onChange={(e) => setForm({ ...form, name: e.target.value })}
-					/>
-				)}
-				<input
-					placeholder='Email'
-					type='email'
-					value={form.email}
-					onChange={(e) => setForm({ ...form, email: e.target.value })}
-				/>
-				<input
-					placeholder='Password'
-					type='password'
-					value={form.password}
-					onChange={(e) => setForm({ ...form, password: e.target.value })}
-				/>
-				<button type='submit'>
-					{isRegister ? "Registrarse" : "Iniciar Sesión"}
+		<div className='page auth-page'>
+			<div className='auth-card'>
+				<h1>{isRegister ? "Crear cuenta" : "Bienvenido"}</h1>
+				<p className='subtitle'>
+					{isRegister
+						? "Regístrate para comenzar a gestionar tus tareas"
+						: "Inicia sesión para continuar con tus pendientes"}
+				</p>
+				<form onSubmit={handleSubmit} className='form'>
+					{isRegister && (
+						<label className='input-group'>
+							<span>Nombre</span>
+							<input
+								required
+								placeholder='¿Cómo te llamas?'
+								value={form.name}
+								onChange={(e) => setForm({ ...form, name: e.target.value })}
+							/>
+						</label>
+					)}
+					<label className='input-group'>
+						<span>Correo</span>
+						<input
+							required
+							type='email'
+							placeholder='tu@email.com'
+							value={form.email}
+							onChange={(e) => setForm({ ...form, email: e.target.value })}
+						/>
+					</label>
+					<label className='input-group'>
+						<span>Contraseña</span>
+						<input
+							required
+							type='password'
+							placeholder='Introduce tu contraseña'
+							value={form.password}
+							onChange={(e) => setForm({ ...form, password: e.target.value })}
+						/>
+					</label>
+					<button className='btn primary full-width' type='submit'>
+						{isRegister ? "Registrarme" : "Iniciar Sesión"}
+					</button>
+				</form>
+				<button
+					type='button'
+					className='btn link'
+					onClick={() => setIsRegister(!isRegister)}
+				>
+					{isRegister
+						? "¿Ya tienes cuenta? Inicia sesión"
+						: "¿No tienes cuenta? Regístrate"}
 				</button>
-			</form>
-			<p
-				onClick={() => setIsRegister(!isRegister)}
-				style={{ cursor: "pointer" }}
-			>
-				{isRegister
-					? "¿Ya tienes cuenta? Inicia sesión"
-					: "¿No tienes cuenta? Regístrate"}
-			</p>
+			</div>
 		</div>
 	);
 }
